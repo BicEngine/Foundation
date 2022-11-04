@@ -20,6 +20,7 @@ use Symfony\Component\Config\Exception\LoaderLoadException;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface as SymfonyContainerInterface;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Dumper\PhpDumper;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
@@ -47,11 +48,6 @@ class Kernel implements KernelInterface
     protected readonly LoopInterface $loop;
 
     /**
-     * @var EventDispatcherInterface
-     */
-    protected readonly EventDispatcherInterface $events;
-
-    /**
      * @psalm-taint-sink file $root
      *
      * @param bool $debug
@@ -76,7 +72,6 @@ class Kernel implements KernelInterface
             $this->extendContainerDefinitions($this->container);
 
             $this->loop = $this->container->get(LoopInterface::class);
-            $this->events = $this->container->get(EventDispatcherInterface::class);
         } catch (\Throwable $e) {
             $this->throw($e);
         }
@@ -237,14 +232,29 @@ class Kernel implements KernelInterface
      */
     private function extendContainerBuilderDefinitions(ContainerBuilder $builder): void
     {
-        $builder->setDefinition(ContainerInterface::class, (new Definition(self::class))->setSynthetic(true));
+        // Path
+        $builder->setDefinition(Path::class, (new Definition(Path::class))
+            ->setSynthetic(true));
 
-        $builder->setAlias(self::class, ContainerInterface::class);
-        $builder->setAlias(KernelInterface::class, ContainerInterface::class);
+        // Kernel
+        $builder->setDefinition(KernelInterface::class, (new Definition(KernelInterface::class))
+            ->setSynthetic(true));
 
-        if (static::class !== self::class) {
-            $builder->setAlias(static::class, ContainerInterface::class);
-        }
+        // Container
+        $builder->setDefinition(ContainerInterface::class, (new Definition(ContainerInterface::class))
+            ->setSynthetic(true));
+        $builder->setAlias(SymfonyContainerInterface::class, ContainerInterface::class);
+    }
+
+    /**
+     * @param Container $container
+     * @return void
+     */
+    private function extendContainerDefinitions(Container $container): void
+    {
+        $container->set(Path::class, $this->path);
+        $container->set(KernelInterface::class, $this);
+        $container->set(ContainerInterface::class, $this->container);
     }
 
     /**
@@ -312,27 +322,24 @@ class Kernel implements KernelInterface
     }
 
     /**
-     * @param Container $container
-     * @return void
-     */
-    private function extendContainerDefinitions(Container $container): void
-    {
-        $container->set(ContainerInterface::class, $this);
-    }
-
-    /**
      * {@inheritDoc}
      */
     public function run(): void
     {
-        $this->events->dispatch(new AppLaunchEvent($this));
+        /** @var EventDispatcherInterface|null $dispatcher */
+        $dispatcher = $this->container->get(
+            EventDispatcherInterface::class,
+            SymfonyContainerInterface::NULL_ON_INVALID_REFERENCE,
+        );
+
+        $dispatcher?->dispatch(new AppLaunchEvent($this));
 
         try {
             $this->loop->start();
         } catch (\Throwable $e) {
             $this->throw($e);
         } finally {
-            $this->events->dispatch(new AppExitEvent($this));
+            $dispatcher?->dispatch(new AppExitEvent($this));
         }
     }
 
