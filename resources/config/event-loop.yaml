@@ -1,0 +1,8 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  Bic\Async\LoopInterface:
+    class: Bic\Async\Loop
+    public: true

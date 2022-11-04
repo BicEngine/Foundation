@@ -1,0 +1,14 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  Psr\EventDispatcher\EventDispatcherInterface:
+    public: true
+    class: Bic\Foundation\Dispatcher\EventBus
+
+  Bic\Foundation\Dispatcher\EventBusInterface:
+    alias: Psr\EventDispatcher\EventDispatcherInterface
+
+  Bic\Foundation\Dispatcher\FactoryInterface:
+    class: Bic\Foundation\Dispatcher\Factory
