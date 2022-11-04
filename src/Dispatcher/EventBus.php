@@ -9,21 +9,46 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 final class EventBus implements EventBusInterface
 {
     /**
-     * @var \SplObjectStorage<EventDispatcherInterface>
+     * Note: When using a {@see \SplObjectStorage}, instead of an array, you
+     * can get a PHP bug in which iteration over the object may not occur until
+     * the end in the {@see dispatch()} method:
+     *
+     * ```php
+     *  foreach ($this->dispatchers as $i => $dispatcher) {
+     *     echo $i . ': ' . $event::class . "\n"; // <<< dump
+     *     $dispatcher->dispatch($event);
+     *  }
+     *
+     *  // array
+     *  - 0: Event#1
+     *  - 1: Event#1
+     *  - 0: Event#2
+     *  - 1: Event#2
+     *
+     *  // SplObjectStorage
+     *  - 0: Event#1
+     *  - 0: Event#2
+     *  - 1: Event#2
+     * ```
+     *
+     * This is most likely due to resetting the iterator state inside the
+     * {@see SplObjectStorage}, but we should find out why this happens, because
+     * dispatchers list does not change during iteration.
+     *
+     * @var array<EventDispatcherInterface>
      */
-    private readonly \SplObjectStorage $dispatchers;
-
-    public function __construct()
-    {
-        $this->dispatchers = new \SplObjectStorage();
-    }
+    private array $dispatchers = [];
 
     /**
      * {@inheritDoc}
      */
     public function attach(EventDispatcherInterface $dispatcher): void
     {
-        $this->dispatchers->attach($dispatcher);
+        if (\in_array($dispatcher, $this->dispatchers, true)) {
+            return;
+        }
+
+        $this->dispatchers[] = $dispatcher;
     }
 
     /**
@@ -31,7 +56,12 @@ final class EventBus implements EventBusInterface
      */
     public function detach(EventDispatcherInterface $dispatcher): void
     {
-        $this->dispatchers->detach($dispatcher);
+        foreach ($this->dispatchers as $index => $actual) {
+            if ($dispatcher === $actual) {
+                unset($this->dispatchers[$index]);
+                return;
+            }
+        }
     }
 
     /**
