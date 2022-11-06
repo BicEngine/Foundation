@@ -4,27 +4,26 @@ declare(strict_types=1);
 
 namespace Bic\Foundation\Lifecycle;
 
-use Bic\Async\LoopInterface;
+use Bic\Foundation\Attribute\OnWindowClose;
+use Bic\Foundation\Attribute\OnWindowCreate;
 use Bic\Foundation\Lifecycle\Event\RenderEvent;
 use Bic\Foundation\Lifecycle\Event\UpdateEvent;
+use Bic\UI\Window\Event\WindowCloseEvent;
+use Bic\UI\Window\Event\WindowCreateEvent;
+use Bic\UI\Window\WindowInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 
 final class MainLoop
 {
     /**
+     * @var \WeakMap<WindowInterface, RenderEvent>
+     */
+    private readonly \WeakMap $windows;
+
+    /**
      * @var UpdateEvent
      */
     private readonly UpdateEvent $update;
-
-    /**
-     * @var RenderEvent
-     */
-    private readonly RenderEvent $render;
-
-    /**
-     * @var Interval
-     */
-    private readonly Interval $timer;
 
     /**
      * @param EventDispatcherInterface $dispatcher
@@ -33,21 +32,23 @@ final class MainLoop
         private readonly EventDispatcherInterface $dispatcher,
     ) {
         $this->update = new UpdateEvent(.0);
-        $this->render = new RenderEvent(.0);
+        $this->windows = new \WeakMap();
+    }
 
-        $this->timer = new Interval(function (float $delta) {
-            $this->update->delta = $delta;
-            $this->dispatcher->dispatch($this->update);
+    #[OnWindowCreate]
+    protected function onWindowCreate(WindowCreateEvent $e): void
+    {
+        $this->windows[$e->target] = new RenderEvent($e->target, .0);
+    }
 
-            $this->render->delta = $delta;
-            $this->dispatcher->dispatch($this->render);
-        }, 1 / 60);
+    #[OnWindowClose]
+    protected function onWindowClose(WindowCloseEvent $e): void
+    {
+        unset($this->windows[$e->target]);
     }
 
     /**
      * Note: This method cannot execute outside a {@see \Fiber}.
-     *
-     * {@inheritDoc}
      */
     public function run(): void
     {
@@ -57,8 +58,15 @@ final class MainLoop
             $delta = ($now = \microtime(true)) - $time;
 
             \Fiber::suspend();
-            $this->timer->update($delta);
+            $this->update->delta = $delta;
+            $this->dispatcher->dispatch($this->update);
             \Fiber::suspend();
+
+            foreach ($this->windows as $render) {
+                $render->delta = $delta;
+                $this->dispatcher->dispatch($render);
+                \Fiber::suspend();
+            }
 
             $time = $now;
         }
