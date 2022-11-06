@@ -99,7 +99,7 @@ class Kernel implements KernelInterface
     private function listenErrors(): void
     {
         \set_error_handler(function (int $code, string $message, string $file, int $line): void {
-            $this->throw(new \ErrorException($message, $code, $code, $file, $line));
+            $this->log(new \ErrorException($message, $code, $code, $file, $line));
         }, static::ERROR_LEVEL);
     }
 
