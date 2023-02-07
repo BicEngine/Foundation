@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bic\Foundation\Kernel;
+namespace Bic\Foundation;
 
 interface RunnableInterface
 {
