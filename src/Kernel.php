@@ -27,7 +27,7 @@ abstract class Kernel implements KernelInterface
     /**
      * @var Path
      */
-    private readonly Path $path;
+    public readonly Path $path;
 
     /**
      * @var Container
@@ -44,8 +44,8 @@ abstract class Kernel implements KernelInterface
      */
     public function __construct(
         string|Path $root,
-        protected readonly bool $debug = false,
-        protected readonly ExceptionHandlerInterface $exception = new Factory(),
+        public readonly bool $debug = false,
+        public readonly ExceptionHandlerInterface $exception = new Factory(),
     ) {
         $this->bootPath($root);
         $this->listenErrors();
