@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Bic\Foundation\Exception;
 
+use Bic\Foundation\Exception\Handler\CollisionHandler;
+use Bic\Foundation\Exception\Handler\CompositeHandler;
+use Bic\Foundation\Exception\Handler\ConsoleHandler;
+use Bic\Foundation\Exception\Handler\Win32Handler;
 use FFI\Env\Runtime;
 
 final class Factory implements HandlerInterface

@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Bic\Foundation\Exception;
+namespace Bic\Foundation\Exception\Handler;
+
+use Bic\Foundation\Exception\HandlerInterface;
 
 final class CompositeHandler implements HandlerInterface
 {
@@ -12,6 +14,16 @@ final class CompositeHandler implements HandlerInterface
     public function __construct(
         private readonly array $handlers,
     ) {
+    }
+
+    /**
+     * @param non-empty-list<HandlerInterface> $handlers
+     *
+     * @return static
+     */
+    public static function from(iterable $handlers): self
+    {
+        return new self([...$handlers]);
     }
 
     /**

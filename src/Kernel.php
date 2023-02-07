@@ -4,17 +4,9 @@ declare(strict_types=1);
 
 namespace Bic\Foundation;
 
-use Bic\Async\LoopInterface;
 use Bic\Foundation\Exception\Factory;
 use Bic\Foundation\Exception\HandlerInterface as ExceptionHandlerInterface;
-use Bic\Foundation\DependencyInjection\CompilerPass\EventListenerCompilerPass;
-use Bic\Foundation\DependencyInjection\CompilerPass\RunnableCompilerPass;
-use Bic\Foundation\Dispatcher\FactoryInterface;
-use Bic\Foundation\Kernel\Event\AppLaunchEvent;
-use Bic\Foundation\Kernel\Event\AppExitEvent;
-use Bic\Foundation\Kernel\ErrorLogger;
 use Psr\Container\ContainerInterface;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Config\Exception\FileLoaderImportCircularReferenceException;
 use Symfony\Component\Config\Exception\LoaderLoadException;
 use Symfony\Component\Config\FileLocator;
@@ -25,7 +17,7 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Dumper\PhpDumper;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 
-class Kernel implements KernelInterface
+abstract class Kernel implements KernelInterface
 {
     /**
      * @var int
@@ -41,11 +33,6 @@ class Kernel implements KernelInterface
      * @var Container
      */
     private readonly Container $container;
-
-    /**
-     * @var LoopInterface
-     */
-    protected readonly LoopInterface $loop;
 
     /**
      * @psalm-taint-sink file $root
@@ -70,8 +57,6 @@ class Kernel implements KernelInterface
             );
 
             $this->extendContainerDefinitions($this->container);
-
-            $this->loop = $this->container->get(LoopInterface::class);
         } catch (\Throwable $e) {
             $this->throw($e);
         }
@@ -111,10 +96,7 @@ class Kernel implements KernelInterface
     public function throw(\Throwable $e): void
     {
         $this->log($e);
-
         $this->exception->throw($e);
-
-        $this->stop();
     }
 
     /**
@@ -125,7 +107,7 @@ class Kernel implements KernelInterface
     private function log(\Throwable $e): void
     {
         try {
-            $logger = new ErrorLogger($this->container);
+            $logger = new Logger($this->container);
             $logger->log($e);
         } finally {
             return;
@@ -295,14 +277,7 @@ class Kernel implements KernelInterface
      */
     private function extendContainerBuilderCompilerPass(ContainerBuilder $builder): void
     {
-        $builder->addCompilerPass(new RunnableCompilerPass(
-            LoopInterface::class,
-        ));
-
-        $builder->addCompilerPass(new EventListenerCompilerPass(
-            EventDispatcherInterface::class,
-            FactoryInterface::class,
-        ));
+        //
     }
 
     /**
@@ -319,39 +294,5 @@ class Kernel implements KernelInterface
     private function getContainerClass(): string
     {
         return \ucfirst($this->getEnvironment()) . 'AppContainer';
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public function run(): void
-    {
-        /** @var EventDispatcherInterface|null $dispatcher */
-        $dispatcher = $this->container->get(
-            EventDispatcherInterface::class,
-            SymfonyContainerInterface::NULL_ON_INVALID_REFERENCE,
-        );
-
-        $dispatcher?->dispatch(new AppLaunchEvent($this));
-
-        try {
-            $this->loop->start();
-        } catch (\Throwable $e) {
-            $this->throw($e);
-        } finally {
-            $dispatcher?->dispatch(new AppExitEvent($this));
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public function stop(): void
-    {
-        try {
-            $this->loop->stop();
-        } finally {
-            return;
-        }
     }
 }

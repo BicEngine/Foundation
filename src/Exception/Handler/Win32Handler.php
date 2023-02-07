@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Bic\Foundation\Exception;
+namespace Bic\Foundation\Exception\Handler;
+
+use Bic\Foundation\Exception\HandlerInterface;
 
 final class Win32Handler implements HandlerInterface
 {
-    /**
-     * @var \FFI
-     */
     private readonly \FFI $user32;
 
     public function __construct()
     {
-        $this->user32 = \FFI::cdef(<<<CLANG
+        /** @psalm-suppress MixedAssignment */
+        $this->user32 = \FFI::cdef(<<<'CLANG'
             extern int MessageBoxW(
                 void* hWnd,
                 const char* lpText,

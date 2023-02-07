@@ -5,8 +5,4 @@ services:
 
   Psr\Log\LoggerInterface:
     class: Psr\Log\NullLogger
-
-  Bic\Foundation\Lifecycle\MainLoop:
-    tags:
-      - kernel.runnable: ['run']
-      - kernel.listener: []
+    public: true

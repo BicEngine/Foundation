@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Bic\Foundation\Exception;
+namespace Bic\Foundation\Exception\Handler;
 
+use Bic\Foundation\Exception\HandlerInterface;
 use SebastianBergmann\Environment\Console;
 
 class ConsoleHandler implements HandlerInterface
