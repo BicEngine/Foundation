@@ -125,7 +125,7 @@ abstract class Kernel implements KernelInterface
     /**
      * @template TEntryObject of object
      *
-     * @param class-string $id
+     * @param class-string<TEntryObject>|non-empty-string $id
      * @return TEntryObject
      *
      * @throws \Exception
