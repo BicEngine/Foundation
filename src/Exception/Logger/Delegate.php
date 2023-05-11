@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Bic\Foundation\Exception\Logger;
 
-use Bic\Foundation\Kernel\Exception\LoggerInterface;
+use Bic\Foundation\Exception\LoggerInterface;
 
 abstract class Delegate implements LoggerInterface
 {

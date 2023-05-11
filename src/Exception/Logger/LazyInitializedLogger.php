@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Bic\Foundation\Exception\Logger;
 
-use Bic\Foundation\Kernel\Exception\LoggerInterface as ExceptionLoggerInterface;
+use Bic\Foundation\Exception\LoggerInterface as ExceptionLoggerInterface;
 use Psr\Log\LoggerInterface;
 
 class LazyInitializedLogger implements ExceptionLoggerInterface

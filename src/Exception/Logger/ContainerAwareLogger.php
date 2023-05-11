@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Bic\Foundation\Exception\Logger;
 
-use Bic\Foundation\Kernel\Exception\LoggerInterface;
+use Bic\Foundation\Exception\LoggerInterface;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Bic\Foundation\Kernel\Exception;
+namespace Bic\Foundation\Exception;
 
 interface LoggerInterface
 {
