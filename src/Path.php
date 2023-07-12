@@ -10,13 +10,13 @@ namespace Bic\Foundation;
 final class Path
 {
     /**
-     * @var string
+     * @var non-empty-string
      * @psalm-var PathDelimiterType
      */
     public const DEFAULT_DELIMITER = \DIRECTORY_SEPARATOR;
 
     /**
-     * @var string
+     * @var non-empty-string
      */
     private const ERROR_ROOT_DIRECTORY = 'Can not determine application root directory';
 

@@ -12,17 +12,11 @@ use FFI\Env\Runtime;
 
 final class Factory implements HandlerInterface
 {
-    /**
-     * @param bool $ui
-     */
     public function __construct(
         public readonly bool $ui = true,
     ) {
     }
 
-    /**
-     * @return HandlerInterface
-     */
     private function cli(): HandlerInterface
     {
         if (\class_exists(\NunoMaduro\Collision\Writer::class)) {
@@ -32,9 +26,6 @@ final class Factory implements HandlerInterface
         return new ConsoleHandler();
     }
 
-    /**
-     * @return HandlerInterface|null
-     */
     private function ui(): ?HandlerInterface
     {
         if (\PHP_OS_FAMILY === 'Windows' && Runtime::isAvailable()) {
@@ -44,9 +35,6 @@ final class Factory implements HandlerInterface
         return null;
     }
 
-    /**
-     * @return HandlerInterface
-     */
     private function instance(): HandlerInterface
     {
         $ui = $this->ui();
@@ -58,9 +46,6 @@ final class Factory implements HandlerInterface
         return $this->cli();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public function throw(\Throwable $e): void
     {
         $handler = $this->instance();

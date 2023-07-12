@@ -6,6 +6,7 @@ namespace Bic\Foundation;
 
 use Bic\Foundation\Exception\Factory;
 use Bic\Foundation\Exception\HandlerInterface as ExceptionHandlerInterface;
+use Dotenv\Dotenv;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\Config\Exception\FileLoaderImportCircularReferenceException;
 use Symfony\Component\Config\Exception\LoaderLoadException;
@@ -19,27 +20,12 @@ use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 
 abstract class Kernel implements KernelInterface
 {
-    /**
-     * @var int
-     */
-    protected const ERROR_LEVEL = \E_ALL;
-
-    /**
-     * @var Path
-     */
     public readonly Path $path;
-
-    /**
-     * @var Container
-     */
-    private readonly Container $container;
+    public readonly Container $container;
 
     /**
      * @psalm-taint-sink file $root
-     *
-     * @param bool $debug
      * @param non-empty-string|Path $root
-     * @param ExceptionHandlerInterface $exception
      * @throws \Exception
      */
     public function __construct(
@@ -48,7 +34,6 @@ abstract class Kernel implements KernelInterface
         public readonly ExceptionHandlerInterface $exception = new Factory(),
     ) {
         $this->bootPath($root);
-        $this->listenErrors();
 
         try {
             $this->container = $this->getCachedContainer(
@@ -63,10 +48,23 @@ abstract class Kernel implements KernelInterface
     }
 
     /**
+     * @psalm-taint-sink file $directory
+     * @param non-empty-string $directory
+     * @return class-string<static>
+     */
+    public static function loadDotenv(string $directory): string
+    {
+        if (\is_file('.env')) {
+            $dotenv = Dotenv::createImmutable($directory);
+            $dotenv->load();
+        }
+
+        return static::class;
+    }
+
+    /**
      * @psalm-taint-sink file $root
      * @param non-empty-string|Path $root
-     *
-     * @return void
      */
     private function bootPath(string|Path $root): void
     {
@@ -78,40 +76,12 @@ abstract class Kernel implements KernelInterface
     }
 
     /**
-     * @return void
-     * @throws \Exception
-     */
-    private function listenErrors(): void
-    {
-        \set_error_handler(function (int $code, string $message, string $file, int $line): void {
-            $this->log(new \ErrorException($message, $code, $code, $file, $line));
-        }, static::ERROR_LEVEL);
-    }
-
-    /**
      * @param \Throwable $e
-     * @return int
      * @throws \Exception
      */
     public function throw(\Throwable $e): void
     {
-        $this->log($e);
         $this->exception->throw($e);
-    }
-
-    /**
-     * @param \Throwable $e
-     * @return void
-     * @throws \Exception
-     */
-    private function log(\Throwable $e): void
-    {
-        try {
-            $logger = new Logger($this->container);
-            $logger->log($e);
-        } finally {
-            return;
-        }
     }
 
     /**
@@ -126,6 +96,7 @@ abstract class Kernel implements KernelInterface
      * @template TEntryObject of object
      *
      * @param class-string<TEntryObject>|non-empty-string $id
+     *
      * @return TEntryObject
      *
      * @throws \Exception
@@ -140,7 +111,7 @@ abstract class Kernel implements KernelInterface
     /**
      * @param non-empty-string $pathname
      * @param class-string<Container> $class
-     * @return Container
+     *
      * @throws FileLoaderImportCircularReferenceException
      * @throws LoaderLoadException
      */
@@ -149,8 +120,9 @@ abstract class Kernel implements KernelInterface
         if ($this->debug || !\is_file($pathname)) {
             $dumper = new PhpDumper($this->createContainer());
 
-            if (!\is_dir(\dirname($pathname))) {
-                \mkdir(\dirname($pathname), recursive: true);
+            if (!@\mkdir($directory = \dirname($pathname), recursive: true)
+                && !\is_dir($directory)) {
+                throw new \RuntimeException(\sprintf('Directory "%s" was not created', $directory));
             }
 
             /** @var string $result */
@@ -159,13 +131,12 @@ abstract class Kernel implements KernelInterface
             \file_put_contents($pathname, $result);
         }
 
-        require $pathname;
+        require_once $pathname;
 
         return new $class();
     }
 
     /**
-     * @return ContainerBuilder
      * @throws FileLoaderImportCircularReferenceException
      * @throws LoaderLoadException
      */
@@ -183,11 +154,7 @@ abstract class Kernel implements KernelInterface
         return $builder;
     }
 
-    /**
-     * @param ContainerBuilder $builder
-     * @return void
-     */
-    private function extendContainerBuilderParameters(ContainerBuilder $builder): void
+    protected function extendContainerBuilderParameters(ContainerBuilder $builder): void
     {
         $builder->setParameter('app.debug', $this->debug);
         $builder->setParameter('app.environment', $this->getEnvironment());
@@ -201,18 +168,14 @@ abstract class Kernel implements KernelInterface
     }
 
     /**
-     * @return string
+     * @return non-empty-string
      */
     private function getEnvironment(): string
     {
         return \strtolower(\PHP_OS_FAMILY);
     }
 
-    /**
-     * @param ContainerBuilder $builder
-     * @return void
-     */
-    private function extendContainerBuilderDefinitions(ContainerBuilder $builder): void
+    protected function extendContainerBuilderDefinitions(ContainerBuilder $builder): void
     {
         // Path
         $builder->setDefinition(Path::class, (new Definition(Path::class))
@@ -222,17 +185,16 @@ abstract class Kernel implements KernelInterface
         $builder->setDefinition(KernelInterface::class, (new Definition(KernelInterface::class))
             ->setSynthetic(true));
 
+        $builder->setAlias(self::class, KernelInterface::class);
+        $builder->setAlias(static::class, KernelInterface::class);
+
         // Container
         $builder->setDefinition(ContainerInterface::class, (new Definition(ContainerInterface::class))
             ->setSynthetic(true));
         $builder->setAlias(SymfonyContainerInterface::class, ContainerInterface::class);
     }
 
-    /**
-     * @param Container $container
-     * @return void
-     */
-    private function extendContainerDefinitions(Container $container): void
+    protected function extendContainerDefinitions(Container $container): void
     {
         $container->set(Path::class, $this->path);
         $container->set(KernelInterface::class, $this);
@@ -240,18 +202,14 @@ abstract class Kernel implements KernelInterface
     }
 
     /**
-     * @param ContainerBuilder $builder
-     * @return void
      * @throws FileLoaderImportCircularReferenceException
      * @throws LoaderLoadException
      */
-    private function extendContainerBuilderConfigs(ContainerBuilder $builder): void
+    protected function extendContainerBuilderConfigs(ContainerBuilder $builder): void
     {
         $loader = new YamlFileLoader($builder, new FileLocator(
             $this->getConfigDirectories(),
         ), $this->getEnvironment());
-
-        $loader->import(__DIR__ . '/../resources/config/*.yaml');
 
         foreach ($this->getConfigDirectories() as $directory) {
             $loader->import($directory . '/*.yaml');
@@ -275,7 +233,7 @@ abstract class Kernel implements KernelInterface
      * @param ContainerBuilder $builder
      * @return void
      */
-    private function extendContainerBuilderCompilerPass(ContainerBuilder $builder): void
+    protected function extendContainerBuilderCompilerPass(ContainerBuilder $builder): void
     {
         //
     }
