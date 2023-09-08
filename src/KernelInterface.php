@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Bic\Foundation;
 
-use Bic\Foundation\Exception\HandlerInterface;
 use Psr\Container\ContainerInterface;
 
-interface KernelInterface extends HandlerInterface, ContainerInterface
+interface KernelInterface extends ContainerInterface
 {
 }

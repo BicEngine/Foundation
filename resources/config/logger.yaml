@@ -1,8 +1,0 @@
-services:
-  _defaults:
-    autowire: true
-    autoconfigure: true
-
-  Psr\Log\LoggerInterface:
-    class: Psr\Log\NullLogger
-    public: true

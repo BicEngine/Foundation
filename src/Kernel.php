@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Bic\Foundation;
 
-use Bic\Foundation\Exception\Factory;
-use Bic\Foundation\Exception\HandlerInterface as ExceptionHandlerInterface;
 use Dotenv\Dotenv;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\Config\Exception\FileLoaderImportCircularReferenceException;
@@ -21,6 +19,7 @@ use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 abstract class Kernel implements KernelInterface
 {
     public readonly Path $path;
+
     public readonly Container $container;
 
     /**
@@ -30,21 +29,17 @@ abstract class Kernel implements KernelInterface
      */
     public function __construct(
         string|Path $root,
-        public readonly bool $debug = false,
-        public readonly ExceptionHandlerInterface $exception = new Factory(),
+        public readonly string $environment,
+        public readonly bool $debug,
     ) {
         $this->bootPath($root);
 
-        try {
-            $this->container = $this->getCachedContainer(
-                $this->getContainerPathname(),
-                $this->getContainerClass(),
-            );
+        $this->container = $this->getCachedContainer(
+            pathname: $this->getContainerPathname(),
+            class: $this->getContainerClass(),
+        );
 
-            $this->extendContainerDefinitions($this->container);
-        } catch (\Throwable $e) {
-            $this->throw($e);
-        }
+        $this->extendContainerDefinitions($this->container);
     }
 
     /**
@@ -52,7 +47,7 @@ abstract class Kernel implements KernelInterface
      * @param non-empty-string $directory
      * @return class-string<static>
      */
-    public static function loadDotenv(string $directory): string
+    public static function dotenv(string $directory): string
     {
         if (\is_file('.env')) {
             $dotenv = Dotenv::createImmutable($directory);
@@ -76,16 +71,7 @@ abstract class Kernel implements KernelInterface
     }
 
     /**
-     * @param \Throwable $e
-     * @throws \Exception
-     */
-    public function throw(\Throwable $e): void
-    {
-        $this->exception->throw($e);
-    }
-
-    /**
-     * {@inheritDoc}
+     * @param non-empty-string $id
      */
     public function has(string $id): bool
     {
@@ -97,7 +83,7 @@ abstract class Kernel implements KernelInterface
      *
      * @param class-string<TEntryObject>|non-empty-string $id
      *
-     * @return TEntryObject
+     * @return ($id is class-string<TEntryObject> ? TEntryObject : object)
      *
      * @throws \Exception
      * @psalm-suppress InvalidReturnType
@@ -105,6 +91,15 @@ abstract class Kernel implements KernelInterface
      */
     public function get(string $id): object
     {
+        if (!isset($this->container)) {
+            if ($id === static::class || $id === self::class) {
+                return $this;
+            }
+
+            $message = 'Could not fetch service "%s" from non-initialized container';
+            throw new \UnderflowException(\sprintf($message, $id));
+        }
+
         return $this->container->get($id);
     }
 
@@ -156,9 +151,11 @@ abstract class Kernel implements KernelInterface
 
     protected function extendContainerBuilderParameters(ContainerBuilder $builder): void
     {
-        $builder->setParameter('app.debug', $this->debug);
-        $builder->setParameter('app.environment', $this->getEnvironment());
-        $builder->setParameter('app.date', \date('Y-m-d'));
+        $builder->setParameter('kernel.debug', $this->debug);
+        $builder->setParameter('kernel.os', \strtolower(\PHP_OS_FAMILY));
+        $builder->setParameter('kernel.bits', \PHP_INT_SIZE === 8 ? 64 : 32);
+        $builder->setParameter('kernel.environment', $this->getEnvironment());
+        $builder->setParameter('kernel.date', \date('Y-m-d'));
 
         $builder->setParameter('dir.root', $this->path->root);
         $builder->setParameter('dir.app', $this->path->app);
@@ -172,7 +169,7 @@ abstract class Kernel implements KernelInterface
      */
     private function getEnvironment(): string
     {
-        return \strtolower(\PHP_OS_FAMILY);
+        return $this->environment;
     }
 
     protected function extendContainerBuilderDefinitions(ContainerBuilder $builder): void
@@ -229,10 +226,6 @@ abstract class Kernel implements KernelInterface
         return [$this->path->config];
     }
 
-    /**
-     * @param ContainerBuilder $builder
-     * @return void
-     */
     protected function extendContainerBuilderCompilerPass(ContainerBuilder $builder): void
     {
         //
